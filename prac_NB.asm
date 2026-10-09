@@ -500,83 +500,62 @@ copyMatrix endp
 ; state:		Indica l'estat del joc (1-5) ('2': S'han fet moviments).
 ; mAux:         Matriu de suport on posar els nombres rotats a la dreta.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 shiftNumbers proc
-   push ebp
-   mov  ebp, esp 
-	;Inici codi d'alumne de la rutina
+    push ebp
+    mov ebp, esp
+    ;Inici codi d'alumne de la rutina
 
-	Push_all
+    Push_all
 
-    ; Recorrem les 4 files de baix a dalt: r = 3, 2, 1, 0
-    mov ecx, 3                 ; ecx farà de comptador de fila (row)
+    mov esi, 30
 
-shift_row_loop:
-    ; Cada fila té 4 columnes: c = 3 (dreta) fins a 1
-    ; Si trobem un 0 a la casella actual (c), busquem cap a l'esquerra (k < c)
-    ; el primer número diferent de 0 i els intercanviem.
-    mov ebx, 3                 ; ebx = col destino (c)
+fila:
+    mov edi, esi
 
-shift_col_loop:
-    ; offset = (row * 4 + col) * 2
-    mov eax, ecx
-    shl eax, 2                 ; row * 4
-    add eax, ebx               ; row * 4 + col
-    shl eax, 1                 ; * 2 bytes
+buscar:
+    cmp WORD PTR [m+edi], 0
+    jne siguiente
 
-    mov dx, word ptr [m + eax]
-    cmp dx, 0
-    jne shift_next_col         ; Si no és 0, ja hi ha un número aquí, avancem cap a l'esquerra
+    mov ebx, edi
+    sub ebx, 2
 
-    ; Si és 0, busquem a l'esquerra (k des de c - 1 fins a 0)
-    mov edi, ebx
-    dec edi                    ; edi = k = c - 1
+buscarNumero:
+    mov eax, esi
+    sub eax, 6
+    cmp ebx, eax
+    jl siguiente
 
-find_nonzero:
-    cmp edi, 0
-    jl shift_next_col          ; Si hem mirat totes les columnes a l'esquerra i no hi ha res, següent col
+    cmp WORD PTR [m+ebx], 0
+    jne mover
 
-    ; offset_k = (row * 4 + k) * 2
-    mov esi, ecx
-    shl esi, 2
-    add esi, edi
-    shl esi, 1
+    sub ebx, 2
+    jmp buscarNumero
 
-    mov ax, word ptr [m + esi]
-    cmp ax, 0
-    je next_k                  ; Si és 0, continuem buscant més a l'esquerra
+mover:
+    mov ax, WORD PTR [m+ebx]
+    mov WORD PTR [m+edi], ax
+    mov WORD PTR [m+ebx], 0
+    mov BYTE PTR [state], '2'
 
-    ; Hem trobat un valor diferent de zero:
-    ; Moure'l a la posició buida (eax) i posar un 0 a la posició d'origen (esi)
-    ; Recalculem l'adreça de destinació (row, col) a edx:
-    mov edx, ecx
-    shl edx, 2
-    add edx, ebx
-    shl edx, 1
+siguiente:
+    sub edi, 2
 
-    mov word ptr [m + edx], ax
-    mov word ptr [m + esi], 0
-    mov dword ptr [state], 2   ; Marquem que s'ha produït moviment
-    jmp shift_col_loop         ; Reavaluem aquesta mateixa casella (per si cal un altre shift)
+    mov eax, esi
+    sub eax, 6
+    cmp edi, eax
+    jge buscar
 
-next_k:
-    dec edi
-    jmp find_nonzero
-
-shift_next_col:
-    dec ebx
-    cmp ebx, 0
-    jg shift_col_loop          ; Si col > 0, continuem
-
-    dec ecx
-    cmp ecx, 0
-    jge shift_row_loop         ; Si row >= 0, continuem
+    sub esi, 8
+    cmp esi, 6
+    jge fila
 
     Pop_all
 
-	;Fi codi d'alumne de la rutina
-   mov esp, ebp
-   pop ebp
-   ret
+    ;Fi codi d'alumne de la rutina
+    mov esp, ebp
+    pop ebp
+    ret
 
 shiftNumbers endp
 
@@ -601,70 +580,52 @@ shiftNumbers endp
 ; m:			Matriu de 4x4 shorts que conté l'estat del tauler de joc
 ; state:		Indica l'estat del joc (1-5). ('2': S'han fet moviments).
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 addPairs proc
-	push ebp
-	mov  ebp, esp
-	;Inici codi d'alumne de la rutina
+    push ebp
+    mov ebp, esp
+    ;Inici codi d'alumne de la rutina
 
-	Push_all
+    Push_all
 
-    ; Recorrem cada fila de 3 a 0
-    mov ecx, 3                 ; ecx = fila actual (row)
+    mov esi, 30
 
-add_row_loop:
-    ; Dins de cada fila, comparem parelles consecutives de dreta a esquerra:
-    ; col = 3 amb col = 2, col = 2 amb col = 1, col = 1 amb col = 0
-    mov ebx, 3                 ; ebx = col dreta
+filaAdd:
+    mov edi, esi
 
-add_col_loop:
-    ; adreça casella dreta (row, col)
-    mov eax, ecx
-    shl eax, 2
-    add eax, ebx
-    shl eax, 1                 ; eax = offset dreta en bytes
+comparar:
+    mov ax, WORD PTR [m+edi]
 
-    ; adreça casella esquerra (row, col - 1)
-    mov esi, ecx
-    shl esi, 2
-    add esi, ebx
-    dec esi                    ; (row * 4 + col - 1)
-    shl esi, 1                 ; esi = offset esquerra en bytes
+    cmp ax, 0
+    je siguienteAdd
 
-    mov dx, word ptr [m + eax] ; valor casella dreta
-    cmp dx, 0
-    je next_pair               ; Si és 0, no fusiona
+    cmp ax, WORD PTR [m+edi-2]
+    jne siguienteAdd
 
-    cmp dx, word ptr [m + esi] ; comparem casella dreta amb casella esquerra
-    jne next_pair              ; Si no són iguals, no fusionem
+    add WORD PTR [m+edi], ax
+    mov WORD PTR [m+edi-2], 0
+    mov BYTE PTR [state], '2'
 
-    ; Si són iguals i diferents de 0:
-    shl dx, 1                  ; Suma de parella idèntica: x + x = x * 2 (shl 1)
-    mov word ptr [m + eax], dx ; Guardem el resultat a la dreta
-    mov word ptr [m + esi], 0  ; Posem un 0 a l'esquerra
-    mov dword ptr [state], 2   ; Marquem que hi ha hagut canvi d'estat
+siguienteAdd:
+    sub edi, 2
 
-    ; Després de fus ionar, saltem la casella esquerra perquè no es torni a fusionar
-    ; en la mateixa tirada (ex: [2, 2, 2, 2] -> [0, 4, 0, 4], no [0, 0, 0, 8])
-    dec ebx
+    mov eax, esi
+    sub eax, 6
+    cmp edi, eax
+    jg comparar
 
-next_pair:
-    dec ebx
-    cmp ebx, 0
-    jg add_col_loop
-
-    dec ecx
-    cmp ecx, 0
-    jge add_row_loop
+    sub esi, 8
+    cmp esi, 6
+    jge filaAdd
 
     Pop_all
 
- 	;Fi codi d'alumne de la rutina
-	mov esp, ebp
-	pop ebp
-	ret
+    ;Fi codi d'alumne de la rutina
+    mov esp, ebp
+    pop ebp
+    ret
 
 addPairs endp
-
 
 
 
